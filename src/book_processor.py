@@ -4,6 +4,7 @@ from PyPDF2 import PdfReader
 from typing import Optional
 import tempfile
 from .config import ERROR_MESSAGES
+import google.generativeai
 
 class BookProcessor:
     @staticmethod
