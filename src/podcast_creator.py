@@ -1,4 +1,3 @@
-"""Optimized module for creating podcast-style audio conversations."""
 import streamlit as st
 from dataclasses import dataclass
 from typing import Optional, List
@@ -8,10 +7,11 @@ import threading
 import queue
 from concurrent.futures import ThreadPoolExecutor
 
-i=0
+
 @dataclass
 class PodcastResponse:
     """Data class for podcast response."""
+
     text_answer: str
     podcast_script: Optional[str]
     audio: Optional[bytes]
@@ -32,13 +32,16 @@ class AudioProcessor:
         with self._lock:
             if not self._engine:
                 self._engine = pyttsx3.init()
-                self._engine.setProperty('rate', 180)  # Slightly faster speech
+                self._engine.setProperty('rate', 160)  # Slightly faster speech
                 self._engine.setProperty('volume', 0.9)
                 voices = self._engine.getProperty('voices')
-                self.voices = {
-                    'host1': voices[0].id,
-                    'host2': voices[1].id if len(voices) > 1 else voices[0].id
-                }
+                if isinstance(voices, (list, tuple)) and len(voices) > 0:
+                    self.voices = {
+                        'host1': voices[0].id,
+                        'host2': voices[1].id if len(voices) > 1 else voices[0].id
+                    }
+                else:
+                    raise ValueError("No voices available in the TTS engine")
 
     def get_audio(self, text: str, voice_id: str) -> Optional[bytes]:
         """Get audio with caching."""
@@ -96,6 +99,7 @@ class PodcastCreator:
     def process_segment(self, text: str, is_first_speaker: bool) -> Optional[bytes]:
         """Process a single conversation segment."""
         voice_id = self.audio_processor.voices['host1'] if is_first_speaker else self.audio_processor.voices['host2']
+        print(text)
         return self.audio_processor.get_audio(text, voice_id)
 
     def create_podcast(self, script: str) -> Optional[bytes]:
