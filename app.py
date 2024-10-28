@@ -1,4 +1,4 @@
-"""Main application file for Book Analysis Podcast System with enhanced styling."""
+"""Main application file for Book Analysis Podcast System with enhanced styling and workflow."""
 import streamlit as st
 from src.book_processor import BookProcessor
 from src.text_analyzer import TextAnalyzer
@@ -9,6 +9,7 @@ from src.utils import (
     display_error,
     display_success,
     display_info,
+    create_download_link
 )
 from src.config import PAGE_TITLE, PAGE_ICON, LAYOUT
 
@@ -223,134 +224,94 @@ def initialize_components():
         st.session_state.text_analyzer = TextAnalyzer()
     if 'podcast_creator' not in st.session_state:
         st.session_state.podcast_creator = PodcastCreator()
-    if 'current_file' not in st.session_state:
-        st.session_state.current_file = None
-    if 'input_text' not in st.session_state:
-        st.session_state.input_text = None
+    if 'current_content' not in st.session_state:
+        st.session_state.current_content = None
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+
+def process_content(content):
+    """Process the content and generate initial analysis and podcast."""
+    with st.spinner("🤔 Analyzing content..."):
+        # Generate text summary
+        summary = st.session_state.text_analyzer.generate_summary(content)
+
+        # Generate podcast script
+        podcast_script = st.session_state.text_analyzer.create_podcast_script(summary)
+
+        # Create podcast
+        podcast_audio = st.session_state.podcast_creator.create_podcast(podcast_script)
+
+        if podcast_audio:
+            SessionState.update_book_content(content)
+            SessionState.update_book_analysis(summary)
+            SessionState.update_podcast_audio(podcast_audio)
+            display_success("✨ Content processed successfully!")
+        else:
+            display_error("❌ Failed to generate podcast audio.")
 
 def handle_file_upload(uploaded_file):
     """Handle file upload and processing."""
-    if uploaded_file != st.session_state.current_file:
-        with st.spinner("📖 Processing your book..."):
+    if uploaded_file:
+        with st.spinner("📖 Processing your file..."):
             content = BookProcessor.process_file(uploaded_file)
             if content:
-                SessionState.update_book_content(content)
-                st.session_state.current_file = uploaded_file
-                st.session_state.input_text = None
                 process_content(content)
 
 def handle_text_input(text):
     """Handle text input from text area."""
-    if text != st.session_state.input_text:
+    if text:
         with st.spinner("📖 Processing your text..."):
             content = BookProcessor.process_text(text)
             if content:
-                SessionState.update_book_content(content)
-                st.session_state.current_file = None
-                st.session_state.input_text = text
                 process_content(content)
-def process_content(content):
-    """Process the content regardless of its source."""
-    with st.spinner("🤔 Analyzing content..."):
-        analysis = st.session_state.text_analyzer.analyze_text(content)
-        if analysis['success']:
-            SessionState.update_book_analysis(analysis['analysis'])
-            display_success("✨ Content processed successfully!")
-        else:
-            display_error(f"❌ Analysis failed: {analysis.get('error')}")
+
+def display_summary_and_podcast():
+    """Display the summary and podcast audio."""
+    if st.session_state.book_analysis:
+        st.subheader("📝 Content Summary")
+        st.write(st.session_state.book_analysis)
+
+    if st.session_state.podcast_audio:
+        st.subheader("🎧 Podcast Summary")
+        st.audio(st.session_state.podcast_audio, format="audio/mp3")
+        st.download_button(
+            label="⬇️ Download Podcast",
+            data=st.session_state.podcast_audio,
+            file_name="book_summary_podcast.mp3",
+            mime="audio/mp3"
+        )
 
 def handle_user_question(question: str):
     """Process user question and generate response."""
     try:
-        st.markdown(f"""
-            <div class="chat-message user-message">
-                <strong>You asked:</strong><br>{question}
-            </div>
-        """, unsafe_allow_html=True)
+        with st.spinner("🤖 Generating response..."):
+            answer = st.session_state.text_analyzer.answer_question(question, st.session_state.book_content)
 
-        with st.spinner("🎙️ Creating your personalized response..."):
-            # Get text answer
-            answer = st.session_state.text_analyzer.answer_question(
-                question,
-                st.session_state.book_content
-            )
-
-            # Create podcast script
-            script = st.session_state.text_analyzer.create_podcast_script(answer)
-
-            # Generate podcast
-            result = st.session_state.podcast_creator.process_answer(answer, script)
-
-            # Display response
-            st.markdown("""
-                <div class="chat-message assistant-message">
-                    <strong>Response:</strong>
-                """, unsafe_allow_html=True)
-
-            st.markdown(result.text_answer)
-
-            # Display podcast
-            if result.audio:
-                st.markdown('<div class="audio-player">', unsafe_allow_html=True)
-                st.write("🎧 Listen to the Podcast Version:")
-                try:
-                    st.audio(result.audio, format="audio/wav")
-                    st.download_button(
-                        label="⬇️ Download Audio",
-                        data=result.audio,
-                        file_name=f"podcast_{len(st.session_state.chat_history)}.wav",
-                        mime="audio/wav"
-                    )
-                except Exception as e:
-                    display_error(f"🎵 Audio playback error: {str(e)}")
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # Show conversation script
-            if result.podcast_script:
-                with st.expander("🎭 View Conversation Script", expanded=False):
-                    st.markdown('<div class="podcast-script">', unsafe_allow_html=True)
-                    st.write(result.podcast_script)
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # Update chat history
-            SessionState.add_to_chat_history(question, {
-                'text_answer': result.text_answer,
-                'podcast_script': result.podcast_script,
-                'audio': result.audio,
-                'error': result.error
-            })
+            # Add to chat history
+            SessionState.add_to_chat_history({"role": "user", "content": question})
+            SessionState.add_to_chat_history({"role": "assistant", "content": answer})
 
     except Exception as e:
         display_error(f"❌ Error: {str(e)}")
 
-def display_chat_history():
-    """Display chat history with audio playback."""
-    if st.session_state.chat_history:
-        st.markdown('<div class="chat-history">', unsafe_allow_html=True)
-        st.write("💬 Previous Conversations")
+def display_chat_interface():
+    """Display chat-like interface for user interaction."""
+    st.subheader("💬 Ask Questions")
 
-        for chat in SessionState.get_recent_chat_history():
-            with st.expander(
-                f"🗣️ {chat['question']} ({format_timestamp(chat['timestamp'])})",
-                expanded=False
-            ):
-                st.markdown('<div class="content-container">', unsafe_allow_html=True)
-                st.write(chat['answer'])
+    # Display chat history
+    for message in st.session_state.chat_history:
+        if message["role"] == "user":
+            st.markdown(f"<div class='chat-message user-message'><strong>You:</strong> {message['content']}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='chat-message assistant-message'><strong>Assistant:</strong> {message['content']}</div>", unsafe_allow_html=True)
 
-                if chat.get('audio'):
-                    st.markdown('<div class="audio-player">', unsafe_allow_html=True)
-                    st.audio(chat['audio'], format="audio/wav")
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                if chat.get('podcast_script'):
-                    st.markdown('<div class="podcast-script">', unsafe_allow_html=True)
-                    st.write("📝 Conversation Script:")
-                    st.write(chat['podcast_script'])
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                st.markdown('</div>', unsafe_allow_html=True)
+    # User input
+    user_question = st.text_input("Ask a question about the content:")
+    if st.button("Send", key="send_question"):
+        if user_question:
+            handle_user_question(user_question)
+        else:
+            display_info("Please enter a question.")
 
 def main():
     """Main application function."""
@@ -369,66 +330,32 @@ def main():
     SessionState.initialize()
     initialize_components()
 
-    st.title("📚 Interactive Book")
+    st.title("📚 Interactive Book Analyzer")
 
-    # Welcome message
-    st.markdown('<div class="content-container">', unsafe_allow_html=True)
-    st.write("""
-    Welcome! Upload your book, paste text, or write directly to get insights in both text and podcast format. 
-    Experience your book discussions as engaging conversations between our AI hosts.
-    """)
+    # Content input section
+    st.header("📥 Input Your Content")
+    input_type = st.radio("Choose input type:", ("Upload File", "Paste Text"))
 
-    # Create layout
-    col1, col2 = st.columns([1, 3])
-
-    with col1:
-        st.write("📤 Upload Your Book or Enter Text")
-        uploaded_file = st.file_uploader(
-            "Select PDF or TXT file",
-            type=["pdf", "txt"],
-            help="Supported formats: PDF, TXT"
-        )
-
-        text_input = st.text_area(
-            "Or paste/write your text here",
-            height=200,
-            help="Enter your text directly or paste from another source"
-        )
-
+    if input_type == "Upload File":
+        uploaded_file = st.file_uploader("Upload a PDF or TXT file", type=["pdf", "txt"])
         if uploaded_file:
             handle_file_upload(uploaded_file)
-        elif text_input:
+    else:
+        text_input = st.text_area("Paste your text here:", height=200)
+        if st.button("Process Text"):
             handle_text_input(text_input)
 
-        if st.session_state.chat_history:
-            if st.button("🗑️ Clear History"):
-                SessionState.clear_chat_history()
-                st.success("History cleared!")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Display summary and podcast if available
+    if st.session_state.book_content:
+        col1, col2 = st.columns([2, 1])
 
-    with col2:
-        if st.session_state.book_content:
-            if st.session_state.book_analysis:
-                with st.expander("📖 Content Analysis", expanded=False):
-                    st.write(st.session_state.book_analysis)
+        with col1:
+            display_summary_and_podcast()
 
-            st.write("❓ Ask About Your Content")
-            question = st.text_area(
-                "What would you like to know?",
-                height=100,
-                placeholder="Type your question here..."
-            )
-
-            if st.button("🔍 Get Answer", type="primary"):
-                if question:
-                    handle_user_question(question)
-                else:
-                    display_info("Please enter a question first!")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            display_chat_history()
-        else:
-            display_info("👈 Upload a book or enter text to begin!")
+        with col2:
+            display_chat_interface()
+    else:
+        display_info("👆 Input your content to get started!")
 
     st.markdown("---")
     st.markdown("""

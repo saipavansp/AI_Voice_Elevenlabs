@@ -11,32 +11,10 @@ class SessionState:
             st.session_state.book_content = None
         if 'book_analysis' not in st.session_state:
             st.session_state.book_analysis = None
+        if 'podcast_audio' not in st.session_state:
+            st.session_state.podcast_audio = None
         if 'chat_history' not in st.session_state:
             st.session_state.chat_history = []
-        if 'current_file' not in st.session_state:
-            st.session_state.current_file = None
-
-    @staticmethod
-    def add_to_chat_history(question: str, response: Dict[str, Any]):
-        """Add Q&A interaction to chat history."""
-        st.session_state.chat_history.append({
-            'timestamp': datetime.now(),
-            'question': question,
-            'answer': response.get('text_answer'),
-            'podcast_script': response.get('podcast_script'),
-            'audio': response.get('audio'),
-            'error': response.get('error')
-        })
-
-    @staticmethod
-    def get_recent_chat_history(limit: int = 5) -> list:
-        """Get recent chat history."""
-        return list(reversed(st.session_state.chat_history[-limit:]))
-
-    @staticmethod
-    def clear_chat_history():
-        """Clear chat history."""
-        st.session_state.chat_history = []
 
     @staticmethod
     def update_book_content(content: Optional[str]):
@@ -44,6 +22,30 @@ class SessionState:
         st.session_state.book_content = content
 
     @staticmethod
-    def update_book_analysis(analysis: Optional[Dict[str, Any]]):
+    def update_book_analysis(analysis: Optional[str]):
         """Update book analysis in session state."""
         st.session_state.book_analysis = analysis
+
+    @staticmethod
+    def update_podcast_audio(audio: Optional[bytes]):
+        """Update podcast audio in session state."""
+        st.session_state.podcast_audio = audio
+
+    @staticmethod
+    def add_to_chat_history(message: Dict[str, str]):
+        """Add a message to the chat history."""
+
+        st.session_state.chat_history.append(message)
+
+    @staticmethod
+    def clear_chat_history():
+        """Clear the chat history."""
+        st.session_state.chat_history = []
+
+    @staticmethod
+    def clear_all():
+        """Clear all session state data."""
+        st.session_state.book_content = None
+        st.session_state.book_analysis = None
+        st.session_state.podcast_audio = None
+        st.session_state.chat_history = []

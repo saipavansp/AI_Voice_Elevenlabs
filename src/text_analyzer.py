@@ -25,38 +25,72 @@ class TextAnalyzer:
         return [text[i:i + self.chunk_size]
                 for i in range(0, len(text), self.chunk_size)]
 
-    def analyze_text(self, content: str) -> Dict[str, Any]:
-        """Analyze book content using Gemini."""
+    def generate_summary(self, content: str) -> str:
+        """Generate a summary of the content."""
         try:
             chunks = self._chunk_text(content)
-            analyses = []
+            summaries = []
 
             for chunk in chunks:
                 prompt = """
-                Analyze this book content and provide:
-                1. Brief summary
-                2. Main themes and key concepts
-                3. Important points and insights
-                4. Key takeaways
-                
+                Provide a concise summary of the following content. Focus on the main ideas and key points:
+
                 Content: {content}
+
+                Summary:
                 """
 
                 response = self.model.generate_content(prompt.format(content=chunk))
-                analyses.append(response.text)
 
-            combined_analysis = "\n\n".join(analyses)
+                summaries.append(response.text)
 
-            return {
-                'success': True,
-                'analysis': combined_analysis
-            }
+            combined_summary = "\n\n".join(summaries)
+
+            # Generate a final, condensed summary
+            final_summary_prompt = f"""
+            Condense the following summaries into a single, coherent summary of no more than 500 words:
+
+            {combined_summary}
+
+            Final Summary:
+            """
+
+            final_summary = self.model.generate_content(final_summary_prompt)
+            return final_summary.text
+
         except Exception as e:
-            logger.error(f"Error in analyze_text: {str(e)}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            logger.error(f"Error in generate_summary: {str(e)}", exc_info=True)
+            return f"Error generating summary: {str(e)}"
+
+    def create_podcast_script(self, summary: str) -> str:
+        """Convert summary to a natural conversation format for a podcast."""
+        try:
+            prompt = """
+            Convert this summary into a natural podcast conversation between Sarah and Mike.
+            Sarah is an enthusiastic book expert, and Mike is a curious interviewer.
+            
+            Make it sound natural with:
+            - Casual conversation flow
+            - Questions and follow-ups
+            - Personal insights
+            - Clear explanations
+            - Engaging discussion
+            
+            The conversation should be around 5-7 minutes long when spoken.
+            
+            Format each line as: 
+            Sarah: [dialogue]
+            Mike: [dialogue]
+            
+            Summary to convert:
+            {summary}
+            """
+
+            response = self.model.generate_content(prompt.format(summary=summary))
+            return response.text
+        except Exception as e:
+            logger.error(f"Error in create_podcast_script: {str(e)}", exc_info=True)
+            return f"Error creating podcast script: {str(e)}"
 
     def answer_question(self, question: str, content: str) -> str:
         """Generate answer using Gemini."""
@@ -66,12 +100,12 @@ class TextAnalyzer:
 
             for chunk in chunks:
                 prompt = f"""
-                Based on this book content, answer the following question:
+                Based on this content, answer the following question:
                 Question: {question}
                 
                 Content: {chunk}
                 
-                Provide a detailed answer using specific information from the book.
+                Provide a detailed answer using specific information from the content.
                 Include examples and explain your reasoning.
                 """
 
@@ -84,31 +118,3 @@ class TextAnalyzer:
         except Exception as e:
             logger.error(f"Error in answer_question: {str(e)}", exc_info=True)
             return f"Error generating answer: {str(e)}"
-
-    def create_podcast_script(self, text: str) -> Optional[str]:
-        """Convert text to natural conversation format."""
-        try:
-            prompt = """
-            Convert this text into a natural podcast conversation between Sarah and Mike.
-            Sarah is an enthusiastic book expert, and Mike is a curious interviewer.
-            
-            Make it sound natural with:
-            - Casual conversation flow
-            - Questions and follow-ups
-            - Personal insights
-            - Clear explanations
-            - Engaging discussion
-            
-            Format each line as: 
-            Sarah: [dialogue]
-            Mike: [dialogue]
-            
-            Text to convert:
-            {text}
-            """
-
-            response = self.model.generate_content(prompt.format(text=text))
-            return response.text
-        except Exception as e:
-            logger.error(f"Error in create_podcast_script: {str(e)}", exc_info=True)
-            return None

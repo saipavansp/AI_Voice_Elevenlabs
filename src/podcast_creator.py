@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import io
 from gtts import gTTS
 import re
-import os
+
 
 
 @dataclass
