@@ -3,17 +3,22 @@ import streamlit as st
 import google.generativeai as genai
 from typing import Dict, Any, Optional
 from .config import MAX_CHUNK_SIZE, MODEL_NAME, ERROR_MESSAGES
+from .logger import logger
 
 class TextAnalyzer:
     def __init__(self):
         """Initialize the text analyzer."""
-        if 'GOOGLE_API_KEY' not in st.secrets:
-            st.error(ERROR_MESSAGES['no_api_key'])
-            st.stop()
+        try:
+            if 'GOOGLE_API_KEY' not in st.secrets:
+                raise ValueError(ERROR_MESSAGES['no_api_key'])
 
-        genai.configure(api_key=st.secrets['GOOGLE_API_KEY'])
-        self.model = genai.GenerativeModel(MODEL_NAME)
-        self.chunk_size = MAX_CHUNK_SIZE
+            genai.configure(api_key=st.secrets['GOOGLE_API_KEY'])
+            self.model = genai.GenerativeModel(MODEL_NAME)
+            self.chunk_size = MAX_CHUNK_SIZE
+        except Exception as e:
+            logger.error(f"Error initializing TextAnalyzer: {str(e)}", exc_info=True)
+            st.error("Failed to initialize TextAnalyzer. Check the logs for more details.")
+            st.stop()
 
     def _chunk_text(self, text: str) -> list[str]:
         """Split text into manageable chunks."""
@@ -47,6 +52,7 @@ class TextAnalyzer:
                 'analysis': combined_analysis
             }
         except Exception as e:
+            logger.error(f"Error in analyze_text: {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e)
@@ -76,6 +82,7 @@ class TextAnalyzer:
             return best_response
 
         except Exception as e:
+            logger.error(f"Error in answer_question: {str(e)}", exc_info=True)
             return f"Error generating answer: {str(e)}"
 
     def create_podcast_script(self, text: str) -> Optional[str]:
@@ -103,5 +110,5 @@ class TextAnalyzer:
             response = self.model.generate_content(prompt.format(text=text))
             return response.text
         except Exception as e:
-            st.error(f"Error creating conversation: {str(e)}")
+            logger.error(f"Error in create_podcast_script: {str(e)}", exc_info=True)
             return None

@@ -33,7 +33,7 @@ class AudioProcessor:
         with self._lock:
             if not self._engine:
                 self._engine = pyttsx3.init()
-                self._engine.setProperty('rate', 150)  # Slightly slower for clarity
+                self._engine.setProperty('rate', 160)  # Slightly slower for clarity
                 self._engine.setProperty('volume', 0.9)
                 voices = self._engine.getProperty('voices')
                 if isinstance(voices, (list, tuple)) and len(voices) > 0:
