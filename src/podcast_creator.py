@@ -4,6 +4,8 @@ from typing import Optional, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import io
 from gtts import gTTS
+import re
+
 
 @dataclass
 class PodcastResponse:
@@ -13,8 +15,9 @@ class PodcastResponse:
     audio: Optional[bytes]
     error: Optional[str] = None
 
+
 class AudioProcessor:
-    """Handles text-to-speech conversion with audio concatenation."""
+    """Handles text-to-speech conversion with improved audio concatenation."""
 
     def __init__(self):
         self._audio_cache = {}
@@ -44,20 +47,39 @@ class AudioProcessor:
         """Concatenate multiple audio segments into a single audio stream."""
         return b''.join(audio_segments)
 
+
 class PodcastCreator:
     def __init__(self):
-        """Initialize podcast creator."""
+        """Initialize podcast creator with improved processing."""
         self.audio_processor = AudioProcessor()
         self.executor = ThreadPoolExecutor(max_workers=2)
 
     def clean_script(self, script: str) -> List[tuple]:
-        """Process script into speaker-text pairs."""
+        """Process script into speaker-text pairs with improved handling."""
         segments = []
-        for line in script.split('\n'):
+        lines = script.split('\n')
+
+        for line in lines:
             if ':' in line:
                 speaker, text = line.split(':', 1)
-                segments.append((speaker.strip(), text.strip()))
+                clean_text = self.clean_text(text.strip())
+                if clean_text:
+                    segments.append((speaker.strip(), clean_text))
+
         return segments
+
+    def clean_text(self, text: str) -> str:
+        """Clean the text to remove unwanted symbols and noise."""
+        # Remove any XML-like tags
+        text = re.sub(r'<[^>]+>', '', text)
+
+        # Remove special characters that might cause noise
+        text = re.sub(r'[^\w\s.,?!]', '', text)
+
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+
+        return text
 
     def process_segment(self, speaker: str, text: str) -> Optional[bytes]:
         """Process a single conversation segment."""
@@ -71,7 +93,7 @@ class PodcastCreator:
         return audio_data
 
     def create_podcast(self, script: str) -> Optional[bytes]:
-        """Create podcast with natural conversation flow."""
+        """Create podcast with improved audio handling."""
         try:
             segments = self.clean_script(script)
             if not segments:
@@ -93,7 +115,7 @@ class PodcastCreator:
             return None
 
     def process_answer(self, text_answer: str, podcast_script: Optional[str]) -> PodcastResponse:
-        """Generate podcast response with progress tracking."""
+        """Generate podcast response with improved progress tracking."""
         try:
             if not podcast_script:
                 return PodcastResponse(
@@ -108,7 +130,7 @@ class PodcastCreator:
             status_text.text("Preparing script...")
             progress_bar.progress(0.2)
 
-            status_text.text("Generating audio...")
+            status_text.text("Generating audio segments...")
             audio = self.create_podcast(podcast_script)
             progress_bar.progress(0.8)
 
