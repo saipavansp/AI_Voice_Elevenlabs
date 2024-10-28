@@ -9,8 +9,6 @@ from src.utils import (
     display_error,
     display_success,
     display_info,
-    create_expander_header,
-    create_download_link
 )
 from src.config import PAGE_TITLE, PAGE_ICON, LAYOUT
 
@@ -227,6 +225,8 @@ def initialize_components():
         st.session_state.podcast_creator = PodcastCreator()
     if 'current_file' not in st.session_state:
         st.session_state.current_file = None
+    if 'input_text' not in st.session_state:
+        st.session_state.input_text = None
 
 def handle_file_upload(uploaded_file):
     """Handle file upload and processing."""
@@ -236,14 +236,28 @@ def handle_file_upload(uploaded_file):
             if content:
                 SessionState.update_book_content(content)
                 st.session_state.current_file = uploaded_file
+                st.session_state.input_text = None
+                process_content(content)
 
-                with st.spinner("🤔 Analyzing content..."):
-                    analysis = st.session_state.text_analyzer.analyze_text(content)
-                    if analysis['success']:
-                        SessionState.update_book_analysis(analysis['analysis'])
-                        display_success("✨ Book processed successfully!")
-                    else:
-                        display_error(f"❌ Analysis failed: {analysis.get('error')}")
+def handle_text_input(text):
+    """Handle text input from text area."""
+    if text != st.session_state.input_text:
+        with st.spinner("📖 Processing your text..."):
+            content = BookProcessor.process_text(text)
+            if content:
+                SessionState.update_book_content(content)
+                st.session_state.current_file = None
+                st.session_state.input_text = text
+                process_content(content)
+def process_content(content):
+    """Process the content regardless of its source."""
+    with st.spinner("🤔 Analyzing content..."):
+        analysis = st.session_state.text_analyzer.analyze_text(content)
+        if analysis['success']:
+            SessionState.update_book_analysis(analysis['analysis'])
+            display_success("✨ Content processed successfully!")
+        else:
+            display_error(f"❌ Analysis failed: {analysis.get('error')}")
 
 def handle_user_question(question: str):
     """Process user question and generate response."""
@@ -355,30 +369,36 @@ def main():
     SessionState.initialize()
     initialize_components()
 
-    st.title("📚 AI Book Analysis & Podcast")
+    st.title("📚 Interactive Book")
 
     # Welcome message
     st.markdown('<div class="content-container">', unsafe_allow_html=True)
     st.write("""
-    Welcome! Upload your book and ask questions to get insights in both text and podcast format. 
+    Welcome! Upload your book, paste text, or write directly to get insights in both text and podcast format. 
     Experience your book discussions as engaging conversations between our AI hosts.
     """)
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # Create layout
     col1, col2 = st.columns([1, 3])
 
     with col1:
-        st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-        st.write("📤 Upload Your Book")
+        st.write("📤 Upload Your Book or Enter Text")
         uploaded_file = st.file_uploader(
             "Select PDF or TXT file",
             type=["pdf", "txt"],
             help="Supported formats: PDF, TXT"
         )
 
+        text_input = st.text_area(
+            "Or paste/write your text here",
+            height=200,
+            help="Enter your text directly or paste from another source"
+        )
+
         if uploaded_file:
             handle_file_upload(uploaded_file)
+        elif text_input:
+            handle_text_input(text_input)
 
         if st.session_state.chat_history:
             if st.button("🗑️ Clear History"):
@@ -389,13 +409,10 @@ def main():
     with col2:
         if st.session_state.book_content:
             if st.session_state.book_analysis:
-                with st.expander("📖 Book Analysis", expanded=False):
-                    st.markdown('<div class="content-container">', unsafe_allow_html=True)
+                with st.expander("📖 Content Analysis", expanded=False):
                     st.write(st.session_state.book_analysis)
-                    st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="question-container">', unsafe_allow_html=True)
-            st.write("❓ Ask About Your Book")
+            st.write("❓ Ask About Your Content")
             question = st.text_area(
                 "What would you like to know?",
                 height=100,
@@ -411,7 +428,7 @@ def main():
 
             display_chat_history()
         else:
-            display_info("👈 Upload a book to begin!")
+            display_info("👈 Upload a book or enter text to begin!")
 
     st.markdown("---")
     st.markdown("""

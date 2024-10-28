@@ -1,4 +1,4 @@
-"""Module for processing book files."""
+"""Module for processing book files and text input."""
 import streamlit as st
 from PyPDF2 import PdfReader
 from typing import Optional
@@ -50,6 +50,15 @@ class BookProcessor:
                 return BookProcessor.read_text_file(file)
         except Exception as e:
             st.error(ERROR_MESSAGES['file_read_error'].format(str(e)))
+            return None
+
+    @staticmethod
+    def process_text(text: str) -> Optional[str]:
+        """Process text input."""
+        try:
+            return text.strip()
+        except Exception as e:
+            st.error(ERROR_MESSAGES['text_processing_error'].format(str(e)))
             return None
 
     @staticmethod
