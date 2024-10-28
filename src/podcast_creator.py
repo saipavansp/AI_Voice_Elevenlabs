@@ -1,7 +1,6 @@
 import streamlit as st
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
-import threading
 from concurrent.futures import ThreadPoolExecutor
 import io
 from gtts import gTTS
@@ -15,22 +14,22 @@ class PodcastResponse:
     error: Optional[str] = None
 
 class AudioProcessor:
-    """Handles text-to-speech conversion with improved audio concatenation."""
+    """Handles text-to-speech conversion with audio concatenation."""
 
     def __init__(self):
         self._audio_cache = {}
 
-    def get_audio(self, text: str, voice_id: str) -> Tuple[Optional[bytes], str]:
+    def get_audio(self, text: str, lang: str) -> Tuple[Optional[bytes], str]:
         """Get audio with caching."""
         if not text.strip():
             return None, ""
 
-        cache_key = f"{text}:{voice_id}"
+        cache_key = f"{text}:{lang}"
         if cache_key in self._audio_cache:
             return self._audio_cache[cache_key], ""
 
         try:
-            tts = gTTS(text=text, lang=voice_id, slow=False)
+            tts = gTTS(text=text, lang=lang, slow=False)
             audio_buffer = io.BytesIO()
             tts.write_to_fp(audio_buffer)
             audio_data = audio_buffer.getvalue()
@@ -43,37 +42,27 @@ class AudioProcessor:
     @staticmethod
     def concatenate_audio_files(audio_segments: List[bytes]) -> bytes:
         """Concatenate multiple audio segments into a single audio stream."""
-        if not audio_segments:
-            return b""
-
-        combined_audio = io.BytesIO()
-        for segment in audio_segments:
-            combined_audio.write(segment)
-
-        return combined_audio.getvalue()
+        return b''.join(audio_segments)
 
 class PodcastCreator:
     def __init__(self):
-        """Initialize podcast creator with improved processing."""
+        """Initialize podcast creator."""
         self.audio_processor = AudioProcessor()
         self.executor = ThreadPoolExecutor(max_workers=2)
 
     def clean_script(self, script: str) -> List[tuple]:
-        """Process script into speaker-text pairs with improved handling."""
+        """Process script into speaker-text pairs."""
         segments = []
-        lines = script.split('\n')
-
-        for line in lines:
+        for line in script.split('\n'):
             if ':' in line:
                 speaker, text = line.split(':', 1)
                 segments.append((speaker.strip(), text.strip()))
-
         return segments
 
     def process_segment(self, speaker: str, text: str) -> Optional[bytes]:
         """Process a single conversation segment."""
-        voice_id = 'en-US' if speaker == 'Sarah' else 'en-GB'
-        audio_data, error = self.audio_processor.get_audio(text, voice_id)
+        lang = 'en'
+        audio_data, error = self.audio_processor.get_audio(text, lang)
 
         if error:
             st.error(f"Error processing segment: {error}")
@@ -82,33 +71,21 @@ class PodcastCreator:
         return audio_data
 
     def create_podcast(self, script: str) -> Optional[bytes]:
-        """Create podcast with improved audio handling."""
+        """Create podcast with natural conversation flow."""
         try:
             segments = self.clean_script(script)
             if not segments:
                 return None
 
-            # Process segments in parallel
-            futures = []
-            for speaker, text in segments:
-                future = self.executor.submit(
-                    self.process_segment,
-                    speaker,
-                    text
-                )
-                futures.append(future)
-
-            # Collect audio segments
             audio_segments = []
-            for future in futures:
-                segment = future.result()
-                if segment:
-                    audio_segments.append(segment)
+            for speaker, text in segments:
+                audio_data = self.process_segment(speaker, text)
+                if audio_data:
+                    audio_segments.append(audio_data)
 
             if not audio_segments:
                 return None
 
-            # Concatenate all audio segments
             return self.audio_processor.concatenate_audio_files(audio_segments)
 
         except Exception as e:
@@ -116,7 +93,7 @@ class PodcastCreator:
             return None
 
     def process_answer(self, text_answer: str, podcast_script: Optional[str]) -> PodcastResponse:
-        """Generate podcast response with improved progress tracking."""
+        """Generate podcast response with progress tracking."""
         try:
             if not podcast_script:
                 return PodcastResponse(
@@ -128,18 +105,16 @@ class PodcastCreator:
             progress_bar = st.progress(0)
             status_text = st.empty()
 
-            # Process in steps
             status_text.text("Preparing script...")
             progress_bar.progress(0.2)
 
-            status_text.text("Generating audio segments...")
+            status_text.text("Generating audio...")
             audio = self.create_podcast(podcast_script)
             progress_bar.progress(0.8)
 
             status_text.text("Finalizing podcast...")
             progress_bar.progress(1.0)
 
-            # Clean up
             progress_bar.empty()
             status_text.empty()
 
