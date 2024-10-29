@@ -6,8 +6,6 @@ import io
 from gtts import gTTS
 import re
 
-
-
 @dataclass
 class PodcastResponse:
     """Data class for podcast response."""
@@ -16,24 +14,27 @@ class PodcastResponse:
     audio: Optional[bytes]
     error: Optional[str] = None
 
-
 class AudioProcessor:
-    """Handles text-to-speech conversion with improved audio concatenation."""
+    """Handles text-to-speech conversion with improved audio concatenation and two voices."""
 
     def __init__(self):
         self._audio_cache = {}
+        self.male_voice = {'lang': 'en-us', 'tld': 'com'}
+        self.female_voice = {'lang': 'en-uk', 'tld': 'co.uk'}
 
-    def get_audio(self, text: str, lang: str) -> Tuple[Optional[bytes], str]:
-        """Get audio with caching."""
+    def get_audio(self, text: str, is_male: bool) -> Tuple[Optional[bytes], str]:
+        """Get audio with caching and voice selection."""
         if not text.strip():
             return None, ""
 
-        cache_key = f"{text}:{lang}"
+        voice = self.male_voice if is_male else self.female_voice
+        cache_key = f"{text}:{voice['lang']}:{voice['tld']}"
+
         if cache_key in self._audio_cache:
             return self._audio_cache[cache_key], ""
 
         try:
-            tts = gTTS(text=text, lang=lang, slow=False)
+            tts = gTTS(text=text, lang=voice['lang'], tld=voice['tld'], slow=False)
             audio_buffer = io.BytesIO()
             tts.write_to_fp(audio_buffer)
             audio_data = audio_buffer.getvalue()
@@ -47,7 +48,6 @@ class AudioProcessor:
     def concatenate_audio_files(audio_segments: List[bytes]) -> bytes:
         """Concatenate multiple audio segments into a single audio stream."""
         return b''.join(audio_segments)
-
 
 class PodcastCreator:
     def __init__(self):
@@ -83,9 +83,9 @@ class PodcastCreator:
         return text
 
     def process_segment(self, speaker: str, text: str) -> Optional[bytes]:
-        """Process a single conversation segment."""
-        lang = 'en'
-        audio_data, error = self.audio_processor.get_audio(text, lang)
+        """Process a single conversation segment with voice selection."""
+        is_male = speaker.lower() in ['mike', 'male']
+        audio_data, error = self.audio_processor.get_audio(text, is_male)
 
         if error:
             st.error(f"Error processing segment: {error}")
@@ -94,7 +94,7 @@ class PodcastCreator:
         return audio_data
 
     def create_podcast(self, script: str) -> Optional[bytes]:
-        """Create podcast with improved audio handling."""
+        """Create podcast with improved audio handling and two voices."""
         try:
             segments = self.clean_script(script)
             if not segments:
@@ -105,6 +105,8 @@ class PodcastCreator:
                 audio_data = self.process_segment(speaker, text)
                 if audio_data:
                     audio_segments.append(audio_data)
+                    # Add a short pause between segments
+                    audio_segments.append(b'\x00' * 11025)  # 0.25 seconds of silence
 
             if not audio_segments:
                 return None

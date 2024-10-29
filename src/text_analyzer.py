@@ -68,20 +68,20 @@ class TextAnalyzer:
             prompt = """
             Convert this summary into a natural podcast conversation between Sarah and Mike.
             Sarah is an enthusiastic book expert, and Mike is a curious interviewer.
-            
+
             Make it sound natural with:
             - Casual conversation flow
             - Questions and follow-ups
             - Personal insights
             - Clear explanations
             - Engaging discussion
-            
+
             The conversation should be around 5-7 minutes long when spoken.
-            
+
             Format each line as: 
             Sarah: [dialogue]
             Mike: [dialogue]
-            
+
             Summary to convert:
             {summary}
             """
